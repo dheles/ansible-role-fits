@@ -1,2 +1,13 @@
 ---
-# tasks file for fits
+- name: get java version
+  shell:   "java -version 2>&1"
+  register: java_version_result
+  changed_when: false
+
+  # NOTE: regex_search() returns an array of matches, so we will need returned_java_version[0] to make use of the first (and only) value
+- set_fact: returned_java_version={{ java_version_result.stdout | regex_search('(?P<test>\d+\.\d+)', '\\g<test>' ) }}
+
+- name: test java version
+  fail:
+    msg: "this installation of FITS requires java version {{ fits_minimum_java_version }} or higher"
+  when: "not returned_java_version[0] | version_compare('{{ fits_minimum_java_version }}', '>=')"
