@@ -11,3 +11,48 @@
   fail:
     msg: "this installation of FITS requires java version {{ fits_minimum_java_version }} or higher"
   when: "not returned_java_version[0] | version_compare('{{ fits_minimum_java_version }}', '>=')"
+
+- name: install prereqs
+  package:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - unzip
+
+- name: get fits
+  get_url:
+    url:      "{{ fits_url }}"
+    dest:     "{{ fits_download_dir }}"
+    checksum: "{{ fits_checksum_algo }}:{{ fits_checksum }}"
+  register: got_fits
+
+- name: extract fits
+  unarchive:
+    src:        "{{ fits_download_dir }}/{{ fits_download_file }}"
+    dest:       "{{ fits_install_dir }}"
+    remote_src: yes
+  when: got_fits.changed
+
+- name: make fits script executable
+  file:
+    path: "{{ fits_path }}/fits.sh"
+    mode: "a+x"
+
+- name: add fits to path
+  lineinfile:
+    dest:   "/etc/profile.d/fits.sh"
+    line:   "export PATH=$PATH:{{ fits_path }}/"
+    state:  present
+    create: yes
+
+- name: get fits version
+  shell:   "{{ fits_path }}/fits.sh -v"
+  args:
+    executable: /bin/bash
+  register: fits_version_result
+  changed_when: false
+
+- name: test fits version
+  fail:
+    msg: "attempted to install FITS version {{ fits_version }}, but something went wrong"
+  when: "not fits_version_result.stdout | version_compare('{{ fits_version }}', '==')"
